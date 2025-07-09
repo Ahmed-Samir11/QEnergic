@@ -1,1 +1,1 @@
-# QTorch
+# QEnergy
