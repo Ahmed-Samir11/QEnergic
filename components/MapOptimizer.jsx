@@ -177,21 +177,6 @@ export default function MapOptimizer() {
           </Marker>
         ))}
       </MapContainer>
-      <div className="flex flex-row gap-4 mb-2">
-        <label>
-          Max number of grids (K):
-          <input type="number" min="0" value={K} onChange={e => setK(Number(e.target.value))} className="ml-2 border px-1 w-20" />
-        </label>
-        <label>
-          Min population to cover (M):
-          <input type="number" min="0" value={M} onChange={e => setM(Number(e.target.value))} className="ml-2 border px-1 w-24" />
-        </label>
-      </div>
-      <div className="text-xs text-gray-500 mb-2">
-        <div>Objective: Minimize total installation cost while maximizing the number of people served with electricity.</div>
-        <div>Constraints: Budget (total installation cost), grid count (max number of microgrids), and minimum population coverage (energy needed to be produced).</div>
-        <div>Population at each site is assumed to be 1 unless you provide real data.</div>
-      </div>
       <div className="flex items-center mb-4">
         <div className="mb-2">
           <label>Budget ($): </label>
