@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST="{\"pages/index.js -> ../components/MapOptimizer\":{\"id\":\"pages/index.js -> ../components/MapOptimizer\",\"files\":[\"static/chunks/_pages-dir-browser_components_MapOptimizer_jsx.js\"]}}"
