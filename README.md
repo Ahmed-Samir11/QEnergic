@@ -1,1 +1,1 @@
-# QEnergy
+# QEnergic
