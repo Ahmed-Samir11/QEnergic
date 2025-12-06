@@ -2,8 +2,8 @@
 import numpy as np
 import pandas as pd
 
-def build_qubo(df, budget=900000, max_grids=10, min_population=15000, 
-               alpha=1e-1, gamma=1e-1, theta=1e-6, mu=2, lambda_=1e-2):
+def build_qubo(df, budget=900000, max_grids=10, min_population=5000, 
+               alpha=150, gamma=300, theta=1e-6, mu=2, lambda_=1e-4):
     """
     Build QUBO matrix for microgrid optimization.
     
@@ -11,12 +11,12 @@ def build_qubo(df, budget=900000, max_grids=10, min_population=15000,
         df (pd.DataFrame): DataFrame with site data
         budget (float): Budget constraint
         max_grids (int): Maximum number of grids
-        min_population (int): Minimum population coverage
-        alpha (float): Population coverage weight
-        gamma (float): Energy capacity weight
+        min_population (int): Minimum population coverage (default: 5000, achievable within budget)
+        alpha (float): Population coverage weight (~150 to balance avg cost/pop ratio)
+        gamma (float): Energy capacity weight (~300 to balance avg cost/energy ratio)
         theta (float): Budget penalty weight
         mu (float): Grid count penalty weight
-        lambda_ (float): Population constraint penalty weight
+        lambda_ (float): Population constraint penalty weight (reduced to avoid dominating)
     
     Returns:
         tuple: (QUBO_matrix, offset)
@@ -76,7 +76,7 @@ def objective_function(x, df):
     population_coverage = df["Population_Coverage"].values
     energy_capacity = df["Energy_Capacity_kWh_day"].values
     
-    return np.sum(install_costs * x) - 1e-1 * np.sum(population_coverage * x) - 1e-1 * np.sum(energy_capacity * x)
+    return np.sum(install_costs * x) - 150 * np.sum(population_coverage * x) - 300 * np.sum(energy_capacity * x)
 
 def constraint_budget(x, df, budget=900000):
     """
@@ -106,22 +106,22 @@ def constraint_grids(x, max_grids=10):
     """
     return 2 * (np.sum(x) - max_grids) ** 2
 
-def constraint_population(x, df, min_population=15000):
+def constraint_population(x, df, min_population=5000):
     """
     Calculate population constraint violation.
     
     Args:
         x (np.array): Binary solution vector
         df (pd.DataFrame): DataFrame with site data
-        min_population (int): Minimum population coverage
+        min_population (int): Minimum population coverage (default: 5000, achievable within budget)
     
     Returns:
         float: Population constraint penalty
     """
     population_coverage = df["Population_Coverage"].values
-    return 1e-2 * (min_population - np.sum(population_coverage * x)) ** 2
+    return 1e-4 * (min_population - np.sum(population_coverage * x)) ** 2
 
-def total_cost(x, df, budget=900000, max_grids=10, min_population=15000):
+def total_cost(x, df, budget=900000, max_grids=10, min_population=5000):
     """
     Calculate total cost including all constraints.
     
@@ -130,7 +130,7 @@ def total_cost(x, df, budget=900000, max_grids=10, min_population=15000):
         df (pd.DataFrame): DataFrame with site data
         budget (float): Budget constraint
         max_grids (int): Maximum number of grids
-        min_population (int): Minimum population coverage
+        min_population (int): Minimum population coverage (default: 5000, achievable within budget)
     
     Returns:
         float: Total cost

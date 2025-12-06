@@ -107,14 +107,15 @@ export default async function handler(req, res) {
   const P = candidates.map(c => c.Population_Coverage);
   const E = candidates.map(c => c.Energy_Capacity_kWh_day);
 
-  // Use the same QUBO parameters as the provided script
-  const alpha = 1e-1;      // population coverage weight
-  const gamma = 1e-1;      // energy capacity weight
+  // QUBO hyperparameters (tuned for balanced optimization)
+  // alpha/gamma scaled to match avg cost/benefit ratio: avg_cost=290k, avg_pop=1863, avg_energy=892
+  const alpha = 150;       // population weight: ~avg_cost/avg_pop
+  const gamma = 300;       // energy weight: ~avg_cost/avg_energy
   const theta = 1e-6;      // budget penalty
   const mu = 2;            // grid count penalty
-  const lambda = 1e-2;     // minimum coverage penalty
+  const lambda = 1e-4;     // minimum coverage penalty (reduced to avoid dominating)
   const max_grids = req.body.max_grids ?? 10;
-  const min_population = req.body.min_population ?? 15000;
+  const min_population = req.body.min_population ?? 5000;  // achievable target within budget
 
   for (let i = 0; i < n; i++) {
     // Objective function terms: cost - alpha*population - gamma*energy
