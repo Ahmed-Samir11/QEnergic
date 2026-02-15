@@ -73,6 +73,25 @@ pip install -r requirements.txt
 npm install
 ```
 
+### Environment Variables
+
+This repo keeps secrets/instance identifiers out of source control.
+
+1. Copy the example file:
+
+```bash
+copy .env.example .env.local  # Windows
+# cp .env.example .env.local  # Linux/Mac
+```
+
+2. Fill in values in `.env.local` (it is git-ignored).
+
+- `NEXT_PUBLIC_MAPBOX_TOKEN` (public)
+- `IBM_QUANTUM_INSTANCE_CRN` (server-side only; required for hardware runs)
+- `QISKIT_IBM_TOKEN` (server-side only; optional)
+
+The Next.js quantum API route only returns detailed subprocess logs in development.
+
 ### Running Solvers
 
 ```bash

@@ -13,6 +13,7 @@ import argparse
 import subprocess
 import tempfile
 import os
+import sys
 from data_generator import generate_ethiopia_dataset
 from qubo_builder import build_qubo, analyze_solution
 
@@ -227,9 +228,70 @@ def tabu_search_solver(df, budget, max_grids=10, min_population=15000, iteration
             except:
                 pass
 
+def quantum_solver(df, budget, max_grids=10, min_population=5000, reps=2, maxiter=300, ibm_backend=None):
+    """
+    Quantum (QAOA) solver using the same QUBO as classical solvers.
+    Calls quantum_optimize.py as a subprocess (requires the quantum venv).
+    If ibm_backend is specified, runs on real IBM Quantum hardware.
+    """
+    # Build QUBO
+    Q, offset = build_qubo(df, budget, max_grids, min_population)
+    
+    # Create temporary files
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as qubo_file:
+        json.dump({'Q': Q.tolist()}, qubo_file)
+        qubo_path = qubo_file.name
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as data_file:
+        json.dump(df.to_dict('records'), data_file)
+        data_path = data_file.name
+    
+    try:
+        # Run quantum solver -- uses the same Python that is running this script
+        cmd = [
+            sys.executable, 'quantum_optimize.py',
+            '--qubo_file', qubo_path,
+            '--data_file', data_path,
+            '--reps', str(reps),
+            '--maxiter', str(maxiter)
+        ]
+        if ibm_backend:
+            cmd.extend(['--ibm_backend', ibm_backend])
+        
+        # Real hardware jobs can take minutes; use a generous timeout
+        timeout = 600 if ibm_backend else 300
+        result = subprocess.run(cmd, capture_output=True, text=True,
+                                check=True, timeout=timeout)
+        
+        # Parse result
+        output_lines = result.stdout.strip().split('\n')
+        result_data = json.loads(output_lines[-1])
+        
+        # Create binary solution vector
+        solution = np.zeros(len(df))
+        for idx in result_data['selected_indices']:
+            solution[idx] = 1
+        
+        return solution, result_data
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Quantum solver error: {e}")
+        print(f"stderr: {e.stderr}")
+        return None, None
+    except subprocess.TimeoutExpired:
+        print(f"Quantum solver timed out after {timeout}s")
+        return None, None
+    finally:
+        # Clean up temporary files
+        for path in [qubo_path, data_path]:
+            try:
+                os.unlink(path)
+            except:
+                pass
+
 def main():
     parser = argparse.ArgumentParser(description='Unified microgrid optimization solver')
-    parser.add_argument('--solver', choices=['nar', 'gurobi', 'sa', 'tabu', 'all'], 
+    parser.add_argument('--solver', choices=['nar', 'gurobi', 'sa', 'tabu', 'quantum', 'all'], 
                        default='all', help='Solver to use')
     parser.add_argument('--budget', type=float, default=900000, 
                        help='Budget constraint')
@@ -253,6 +315,13 @@ def main():
                        help='Tabu Search iterations')
     parser.add_argument('--tabu_tenure', type=int, default=10,
                        help='Tabu Search tenure')
+    parser.add_argument('--qaoa_reps', type=int, default=2,
+                       help='QAOA layers (quantum solver)')
+    parser.add_argument('--qaoa_maxiter', type=int, default=300,
+                       help='QAOA optimizer max iterations (quantum solver)')
+    parser.add_argument('--ibm_backend', type=str, default=None,
+                       help='IBM backend name for quantum solver (e.g. ibm_torino). '
+                            'If omitted, quantum solver uses local StatevectorSampler.')
     
     args = parser.parse_args()
     
@@ -267,7 +336,7 @@ def main():
     
     solvers = []
     if args.solver == 'all':
-        solvers = ['nar', 'gurobi', 'sa', 'tabu']
+        solvers = ['nar', 'gurobi', 'sa', 'tabu', 'quantum']
     else:
         solvers = [args.solver]
     
@@ -287,6 +356,9 @@ def main():
         elif solver_name == 'tabu':
             solution, result = tabu_search_solver(df, args.budget, args.max_grids, args.min_population,
                                                   args.tabu_iterations, args.tabu_tenure)
+        elif solver_name == 'quantum':
+            solution, result = quantum_solver(df, args.budget, args.max_grids, args.min_population,
+                                              args.qaoa_reps, args.qaoa_maxiter, args.ibm_backend)
         
         elapsed_time = time.time() - start_time
         

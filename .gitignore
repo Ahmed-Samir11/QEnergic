@@ -1,2 +1,12 @@
 node_modules/
 .next/
+quantum/
+
+# Local environment files (keep .env.example committed)
+.env.local
+.env.*
+!.env.example
+
+# Python caches
+__pycache__/
+*.pyc
