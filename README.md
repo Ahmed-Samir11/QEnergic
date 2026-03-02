@@ -4,8 +4,7 @@
 
 This repository contains the full experimental codebase accompanying the paper:
 
-> *QUBO Model for Energy Planning: Quantum-Enhanced Microgrid Optimization in Rural Electrification*  
-> Farhani et al., GECCO '26 Companion, July 13–17, 2026, San José, Costa Rica.
+> *QUBO Model for Energy Planning: Quantum-Enhanced Microgrid Optimization in Rural Electrification*
 
 ---
 
