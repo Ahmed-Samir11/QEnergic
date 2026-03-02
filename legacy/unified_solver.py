@@ -15,7 +15,82 @@ import tempfile
 import os
 import sys
 from data_generator import generate_ethiopia_dataset
-from qubo_builder import build_qubo, analyze_solution
+from qubo_builder import build_qubo, analyze_solution, enforce_hard_budget, constraint_budget
+
+
+def _evaluate_solution_metrics(x, df, Q, budget, max_grids, min_population, qubo_kwargs=None):
+    """Compute objective diagnostics for a binary solution vector."""
+    qubo_kwargs = qubo_kwargs or {}
+    alpha = float(qubo_kwargs.get("alpha", 150))
+    gamma = float(qubo_kwargs.get("gamma", 300))
+    theta = float(qubo_kwargs.get("theta", 1e-6))
+    mu = float(qubo_kwargs.get("mu", 2))
+    lambda_ = float(qubo_kwargs.get("lambda_", 1e-4))
+    auto_calibrate_theta = bool(qubo_kwargs.get("auto_calibrate_theta", True))
+
+    x_arr = np.array(x, dtype=float)
+    costs = df["Installation_Cost_USD"].values.astype(float)
+    pops = df["Population_Coverage"].values.astype(float)
+    energies = df["Energy_Capacity_kWh_day"].values.astype(float)
+
+    total_cost = float(np.dot(x_arr, costs))
+    total_population = float(np.dot(x_arr, pops))
+    total_energy = float(np.dot(x_arr, energies))
+    selected_sites = int(np.sum(x_arr))
+
+    objective_linear = float(np.sum(costs * x_arr) - alpha * np.sum(pops * x_arr) - gamma * np.sum(energies * x_arr))
+    budget_penalty = float(constraint_budget(
+        x_arr,
+        df,
+        budget=budget,
+        theta=theta,
+        alpha=alpha,
+        gamma=gamma,
+        auto_calibrate_theta=auto_calibrate_theta,
+    ))
+    grid_penalty = float(mu * (np.sum(x_arr) - max_grids) ** 2)
+    population_penalty = float(lambda_ * (min_population - np.sum(pops * x_arr)) ** 2)
+    total_penalty = float(budget_penalty + grid_penalty + population_penalty)
+    xqx = float(x_arr @ Q @ x_arr)
+
+    budget_violation = max(0.0, total_cost - float(budget))
+    grid_violation = max(0.0, selected_sites - int(max_grids))
+    population_shortfall = max(0.0, float(min_population) - total_population)
+
+    return {
+        "xQx": xqx,
+        "objective_linear": objective_linear,
+        "budget_penalty": budget_penalty,
+        "grid_penalty": grid_penalty,
+        "population_penalty": population_penalty,
+        "total_penalty": total_penalty,
+        "total_cost": total_cost,
+        "total_population": total_population,
+        "total_energy": total_energy,
+        "num_sites": selected_sites,
+        "budget_violation": budget_violation,
+        "grid_violation": float(grid_violation),
+        "population_shortfall": population_shortfall,
+        "is_hard_feasible": bool(
+            budget_violation <= 1e-9 and grid_violation <= 0 and population_shortfall <= 1e-9
+        ),
+    }
+
+
+def _default_results_path(mode_name):
+    return os.path.join("results", f"unified_solver_results_{mode_name}.json")
+
+
+def _serialize_for_json(value):
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, (np.integer, np.floating)):
+        return float(value)
+    if isinstance(value, dict):
+        return {k: _serialize_for_json(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_serialize_for_json(v) for v in value]
+    return value
 
 def nar_greedy_solver(df, budget, max_grids=10, record_progress=False):
     """
@@ -66,12 +141,12 @@ def nar_greedy_solver(df, budget, max_grids=10, record_progress=False):
         'num_sites': len(selected_indices)
     }
 
-def gurobi_solver(df, budget, max_grids=10, min_population=15000):
+def gurobi_solver(df, budget, max_grids=10, min_population=15000, qubo_kwargs=None):
     """
     Gurobi solver using the new data structure.
     """
     # Build QUBO
-    Q, offset = build_qubo(df, budget, max_grids, min_population)
+    Q, offset = build_qubo(df, budget, max_grids, min_population, **(qubo_kwargs or {}))
     
     # Create temporary files
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as qubo_file:
@@ -119,12 +194,12 @@ def gurobi_solver(df, budget, max_grids=10, min_population=15000):
             except:
                 pass
 
-def sa_solver(df, budget, max_grids=10, min_population=15000, steps=10000, tmax=25000.0, tmin=0.001, record_progress=False, progress_interval=1):
+def sa_solver(df, budget, max_grids=10, min_population=15000, steps=10000, tmax=25000.0, tmin=0.001, record_progress=False, progress_interval=1, qubo_kwargs=None):
     """
     Simulated Annealing solver using the new data structure.
     """
     # Build QUBO
-    Q, offset = build_qubo(df, budget, max_grids, min_population)
+    Q, offset = build_qubo(df, budget, max_grids, min_population, **(qubo_kwargs or {}))
     
     # Create temporary files
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as qubo_file:
@@ -179,12 +254,12 @@ def sa_solver(df, budget, max_grids=10, min_population=15000, steps=10000, tmax=
             except:
                 pass
 
-def tabu_search_solver(df, budget, max_grids=10, min_population=15000, iterations=1000, tenure=10):
+def tabu_search_solver(df, budget, max_grids=10, min_population=15000, iterations=1000, tenure=10, qubo_kwargs=None):
     """
     Tabu Search solver using the new data structure.
     """
     # Build QUBO
-    Q, offset = build_qubo(df, budget, max_grids, min_population)
+    Q, offset = build_qubo(df, budget, max_grids, min_population, **(qubo_kwargs or {}))
     
     # Create temporary files
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as qubo_file:
@@ -228,14 +303,14 @@ def tabu_search_solver(df, budget, max_grids=10, min_population=15000, iteration
             except:
                 pass
 
-def quantum_solver(df, budget, max_grids=10, min_population=5000, reps=2, maxiter=300, ibm_backend=None):
+def quantum_solver(df, budget, max_grids=10, min_population=5000, reps=2, maxiter=300, ibm_backend=None, qubo_kwargs=None):
     """
     Quantum (QAOA) solver using the same QUBO as classical solvers.
     Calls quantum_optimize.py as a subprocess (requires the quantum venv).
     If ibm_backend is specified, runs on real IBM Quantum hardware.
     """
     # Build QUBO
-    Q, offset = build_qubo(df, budget, max_grids, min_population)
+    Q, offset = build_qubo(df, budget, max_grids, min_population, **(qubo_kwargs or {}))
     
     # Create temporary files
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as qubo_file:
@@ -322,9 +397,59 @@ def main():
     parser.add_argument('--ibm_backend', type=str, default=None,
                        help='IBM backend name for quantum solver (e.g. ibm_torino). '
                             'If omitted, quantum solver uses local StatevectorSampler.')
+    parser.add_argument('--alpha', type=float, default=None,
+                       help='Override QUBO population benefit weight alpha.')
+    parser.add_argument('--gamma', type=float, default=None,
+                       help='Override QUBO energy benefit weight gamma.')
+    parser.add_argument('--theta', type=float, default=None,
+                       help='Override QUBO budget-penalty weight theta.')
+    parser.add_argument('--mu', type=float, default=None,
+                       help='Override QUBO grid-count penalty weight mu.')
+    parser.add_argument('--lambda_weight', type=float, default=None,
+                       help='Override QUBO population-penalty weight lambda_.')
+    parser.add_argument('--disable_auto_theta', action='store_true',
+                       help='Disable adaptive theta calibration in QUBO builder.')
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument('--paper_mode', action='store_true',
+                           help='Use fixed paper penalties with soft constraints (no hard projection).')
+    mode_group.add_argument('--hard_budget_mode', action='store_true',
+                           help='Apply hard budget projection after solver output for reported solution.')
+    parser.add_argument('--save_results', type=str, default=None,
+                       help='Optional JSON output path for solver results and diagnostics.')
     
     args = parser.parse_args()
     
+    mode_name = 'default_mode'
+    qubo_kwargs = {}
+    if args.paper_mode:
+        mode_name = 'paper_mode'
+        qubo_kwargs = {
+            'theta': 1e-6,
+            'mu': 2,
+            'lambda_': 1e-4,
+            'auto_calibrate_theta': False,
+        }
+    elif args.hard_budget_mode:
+        mode_name = 'hard_constraints_mode'
+
+    if args.alpha is not None:
+        qubo_kwargs['alpha'] = args.alpha
+    if args.gamma is not None:
+        qubo_kwargs['gamma'] = args.gamma
+    if args.theta is not None:
+        qubo_kwargs['theta'] = args.theta
+    if args.mu is not None:
+        qubo_kwargs['mu'] = args.mu
+    if args.lambda_weight is not None:
+        qubo_kwargs['lambda_'] = args.lambda_weight
+    if args.disable_auto_theta:
+        qubo_kwargs['auto_calibrate_theta'] = False
+
+    save_results_path = args.save_results or _default_results_path(mode_name)
+    save_results_dir = os.path.dirname(save_results_path)
+    if save_results_dir:
+        os.makedirs(save_results_dir, exist_ok=True)
+
     # Generate dataset
     print("Generating Ethiopia dataset...")
     df = generate_ethiopia_dataset(args.num_sites, args.seed)
@@ -332,7 +457,16 @@ def main():
     print(f"Total potential cost: ${df['Installation_Cost_USD'].sum():,}")
     print(f"Total potential population: {df['Population_Coverage'].sum():,}")
     print(f"Total potential energy: {df['Energy_Capacity_kWh_day'].sum():.2f} kWh/day")
+    print(f"Mode: {mode_name}")
     print()
+
+    Q_reference, offset = build_qubo(
+        df,
+        args.budget,
+        args.max_grids,
+        args.min_population,
+        **qubo_kwargs,
+    )
     
     solvers = []
     if args.solver == 'all':
@@ -349,50 +483,101 @@ def main():
         if solver_name == 'nar':
             solution, result = nar_greedy_solver(df, args.budget, args.max_grids, record_progress=True)
         elif solver_name == 'gurobi':
-            solution, result = gurobi_solver(df, args.budget, args.max_grids, args.min_population)
+            solution, result = gurobi_solver(df, args.budget, args.max_grids, args.min_population, qubo_kwargs=qubo_kwargs)
         elif solver_name == 'sa':
             solution, result = sa_solver(df, args.budget, args.max_grids, args.min_population, 
-                                       args.sa_steps, args.sa_tmax, args.sa_tmin, record_progress=args.record_progress, progress_interval=args.progress_interval)
+                                       args.sa_steps, args.sa_tmax, args.sa_tmin, record_progress=args.record_progress, progress_interval=args.progress_interval, qubo_kwargs=qubo_kwargs)
         elif solver_name == 'tabu':
             solution, result = tabu_search_solver(df, args.budget, args.max_grids, args.min_population,
-                                                  args.tabu_iterations, args.tabu_tenure)
+                                                  args.tabu_iterations, args.tabu_tenure, qubo_kwargs=qubo_kwargs)
         elif solver_name == 'quantum':
             solution, result = quantum_solver(df, args.budget, args.max_grids, args.min_population,
-                                              args.qaoa_reps, args.qaoa_maxiter, args.ibm_backend)
+                                              args.qaoa_reps, args.qaoa_maxiter, args.ibm_backend, qubo_kwargs=qubo_kwargs)
         
         elapsed_time = time.time() - start_time
         
         if solution is not None:
-            # Analyze solution
-            analysis = analyze_solution(solution, df)
+            raw_solution = np.array(solution, dtype=float)
+            projected_solution = np.array(raw_solution, dtype=float)
+            if args.hard_budget_mode:
+                projected_solution = enforce_hard_budget(raw_solution, df, args.budget)
+
+            reported_solution = projected_solution if args.hard_budget_mode else raw_solution
+            analysis = analyze_solution(reported_solution, df)
+            raw_metrics = _evaluate_solution_metrics(
+                raw_solution,
+                df,
+                Q_reference,
+                args.budget,
+                args.max_grids,
+                args.min_population,
+                qubo_kwargs=qubo_kwargs,
+            )
+            projected_metrics = _evaluate_solution_metrics(
+                projected_solution,
+                df,
+                Q_reference,
+                args.budget,
+                args.max_grids,
+                args.min_population,
+                qubo_kwargs=qubo_kwargs,
+            )
+
             results[solver_name] = {
-                'solution': solution,
+                'solution': reported_solution,
+                'raw_solution': raw_solution,
+                'projected_solution': projected_solution,
                 'result': result,
                 'analysis': analysis,
+                'diagnostics': {
+                    'raw': raw_metrics,
+                    'projected': projected_metrics,
+                },
+                'mode': mode_name,
                 'time': elapsed_time
             }
             
-            print(f"✅ {solver_name.upper()} completed in {elapsed_time:.2f} seconds")
+            print(f"[OK] {solver_name.upper()} completed in {elapsed_time:.2f} seconds")
             print(f"   Selected sites: {analysis['num_sites']}")
             print(f"   Total cost: ${analysis['total_cost']:,}")
             print(f"   Total population: {analysis['total_population']:,}")
             print(f"   Total energy: {analysis['total_energy']:.2f} kWh/day")
+            print(f"   xQx (raw): {raw_metrics['xQx']:.2f}")
+            if args.hard_budget_mode:
+                print(f"   xQx (projected): {projected_metrics['xQx']:.2f}")
         else:
-            print(f"❌ {solver_name.upper()} failed")
+            print(f"[FAIL] {solver_name.upper()} failed")
         
         print()
     
     # Summary
     if len(results) > 1:
-        print("📊 Summary:")
+        print("Summary:")
         print("-" * 80)
-        print(f"{'Solver':<12} {'Sites':<6} {'Cost':<12} {'Population':<12} {'Energy':<12} {'Time':<8}")
+        print(f"{'Solver':<12} {'xQx':<14} {'Sites':<6} {'Cost':<12} {'Population':<12} {'Time':<8}")
         print("-" * 80)
         for solver_name, result in results.items():
             analysis = result['analysis']
-            print(f"{solver_name.upper():<12} {analysis['num_sites']:<6} "
+            metrics_key = 'projected' if args.hard_budget_mode else 'raw'
+            xqx_value = result['diagnostics'][metrics_key]['xQx']
+            print(f"{solver_name.upper():<12} {xqx_value:<14.2f} {analysis['num_sites']:<6} "
                   f"${analysis['total_cost']:<11,} {analysis['total_population']:<12,} "
-                  f"{analysis['total_energy']:<11.2f} {result['time']:<8.2f}s")
+                  f"{result['time']:<8.2f}s")
+
+    serializable_results = {
+        'metadata': {
+            'mode': mode_name,
+            'budget': args.budget,
+            'max_grids': args.max_grids,
+            'min_population': args.min_population,
+            'qubo_kwargs': qubo_kwargs,
+            'qubo_offset': float(offset),
+        },
+        'results': _serialize_for_json(results),
+    }
+    with open(save_results_path, 'w', encoding='utf-8') as output_file:
+        json.dump(serializable_results, output_file, indent=2)
+    print(f"\nSaved diagnostics to {save_results_path}")
     
     return results
 

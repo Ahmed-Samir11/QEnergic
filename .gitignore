@@ -1,7 +1,7 @@
 node_modules/
 .next/
 quantum/
-
+paper.tex
 # Local environment files (keep .env.example committed)
 .env.local
 .env.*

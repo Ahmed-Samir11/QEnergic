@@ -13,6 +13,7 @@ Usage:
 import argparse
 import json
 import os
+from pathlib import Path
 import sys
 import time
 import warnings
@@ -40,12 +41,10 @@ FIGURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figures"
 # Consistent solver colors (colorblind-friendly palette)
 SOLVER_COLORS = {
     "NAR Greedy":       "#4477AA",
-    "Gurobi":           "#EE6677",
     "Sim. Annealing":   "#228833",
     "Tabu Search":      "#CCBB44",
     "D-Wave Neal":      "#66CCEE",
-    "QAOA (local)":     "#AA3377",
-    "QAOA (hardware)":  "#BBBBBB",
+    "QAOA (hardware)":  "#AA3377",
 }
 
 SOLVER_ORDER = list(SOLVER_COLORS.keys())
@@ -99,13 +98,27 @@ def run_sa(df, Q):
             x = np.array(self.state)
             return float(x @ self.Q @ x)
 
-    init = np.random.RandomState(42).randint(2, size=len(df))
-    sa = _SA(Q, init)
-    sa.steps = 15_000
-    sa.Tmax = 25_000.0
-    sa.Tmin = 0.001
-    state, _ = sa.anneal()
-    return np.array(state, dtype=float)
+    # 100 independent restarts; return best solution found across all runs.
+    # Matches the multi-read budget of D-Wave Neal for a fair comparison.
+    rng = np.random.RandomState(42)
+    best_energy = float("inf")
+    best_state = None
+    # Calibrate schedule once from a single trial run
+    init0 = rng.randint(2, size=len(df)).tolist()
+    sa0 = _SA(Q, init0)
+    sa0.updates = 0
+    schedule = sa0.auto(minutes=0.05)   # quick calibration probe
+    for _ in range(100):
+        init = rng.randint(2, size=len(df)).tolist()
+        sa = _SA(Q, init)
+        sa.set_schedule(schedule)
+        sa.updates = 0          # suppress per-run progress table
+        sa.copy_strategy = "slice"
+        state, energy = sa.anneal()
+        if energy < best_energy:
+            best_energy = energy
+            best_state = state
+    return np.array(best_state, dtype=float)
 
 
 def run_dwave_neal(df, Q):
@@ -121,7 +134,8 @@ def run_dwave_neal(df, Q):
                 quadratic[(i, j)] = c
     bqm = dimod.BinaryQuadraticModel(linear, quadratic, 0.0, dimod.BINARY)
     sampler = neal.SimulatedAnnealingSampler()
-    ss = sampler.sample(bqm, num_reads=1000, num_sweeps=5000, seed=42)
+    # num_reads=100 matches the 100-restart budget given to Sim. Annealing
+    ss = sampler.sample(bqm, num_reads=100, num_sweeps=5000, seed=42)
     best = ss.first
     return np.array([best.sample[i] for i in range(n)], dtype=float)
 
@@ -284,25 +298,6 @@ def run_qaoa_hardware(df, Q, backend_name):
     return best_solution_overall
 
 
-def run_gurobi(df, Q):
-    """Gurobi exact solver (in-process)."""
-    try:
-        import gurobipy as gp
-        from gurobipy import GRB
-    except ImportError:
-        return None
-    n = Q.shape[0]
-    m = gp.Model()
-    m.setParam("OutputFlag", 0)
-    x = m.addVars(n, vtype=GRB.BINARY, name="x")
-    obj = gp.quicksum(Q[i, j] * x[i] * x[j] for i in range(n) for j in range(n))
-    m.setObjective(obj, GRB.MINIMIZE)
-    m.optimize()
-    if m.status == GRB.Status.INFEASIBLE:
-        return None
-    return np.array([int(x[i].X > 0.5) for i in range(n)], dtype=float)
-
-
 def run_tabu(df, Q):
     """D-Wave Tabu sampler."""
     import dimod
@@ -331,7 +326,6 @@ def run_all_solvers(df, Q, ibm_backend=None, qaoa_local_sites=12):
 
     runners = [
         ("NAR Greedy",     lambda: run_nar(df)),
-        ("Gurobi",         lambda: run_gurobi(df, Q)),
         ("Sim. Annealing", lambda: run_sa(df, Q)),
         ("Tabu Search",    lambda: run_tabu(df, Q)),
         ("D-Wave Neal",    lambda: run_dwave_neal(df, Q)),
@@ -357,7 +351,9 @@ def run_all_solvers(df, Q, ibm_backend=None, qaoa_local_sites=12):
     print(f"  Running QAOA (local, {qaoa_local_sites} sites)...", end=" ", flush=True)
     t0 = time.time()
     try:
-        df_small = generate_ethiopia_dataset(qaoa_local_sites)
+        # Use the first N rows of the original df so site indices align
+        # correctly when the solution is evaluated against the full dataset.
+        df_small = df.iloc[:qaoa_local_sites].reset_index(drop=True)
         Q_small, _ = build_qubo(df_small, BUDGET, MAX_GRIDS, MIN_POPULATION)
         x = run_qaoa_local(df, Q_small, qaoa_local_sites)
         elapsed = time.time() - t0
@@ -414,30 +410,28 @@ def _get_ordered(results):
 # ═════════════════════════════════════════════════════════════════════════════
 
 def fig01_solver_comparison(results, df):
-    """4-panel bar chart: cost, population, energy, sites."""
+    """3-panel bar chart reflecting paper QUBO objectives: cost, population, energy."""
     names, colors = _get_ordered(results)
     metrics = [
-        ("Total Cost (USD)",        "total_cost",       "${x:,.0f}"),
-        ("Population Coverage",     "total_population", "{x:,.0f}"),
-        ("Energy Capacity (kWh/day)", "total_energy",   "{x:,.0f}"),
-        ("Sites Selected",         "num_sites",         "{x:.0f}"),
+        ("Total Installation Cost (USD)", "total_cost",       "${x:,.0f}"),
+        ("Population Coverage",           "total_population", "{x:,.0f}"),
+        ("Energy Capacity (kWh/day)",     "total_energy",     "{x:,.0f}"),
     ]
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    axes = axes.ravel()
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
     for ax, (title, key, fmt) in zip(axes, metrics):
         vals = [results[n]["analysis"][key] for n in names]
         bars = ax.bar(range(len(names)), vals, color=colors, edgecolor="black",
                       linewidth=0.5)
         ax.set_xticks(range(len(names)))
-        ax.set_xticklabels(names, rotation=35, ha="right", fontsize=9)
+        ax.set_xticklabels(names, rotation=40, ha="right", fontsize=9)
         ax.set_title(title, fontweight="bold")
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(
-            lambda x, _: fmt.format(x=x)))
+            lambda x, _, f=fmt: f.format(x=x)))
         for bar, v in zip(bars, vals):
             ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
-                    fmt.format(x=v), ha="center", va="bottom", fontsize=8)
+                    fmt.format(x=v), ha="center", va="bottom", fontsize=7)
     fig.suptitle("Solver Comparison -- Ethiopia Microgrid Optimization",
-                 fontsize=16, fontweight="bold", y=1.01)
+                 fontsize=15, fontweight="bold")
     fig.tight_layout()
     _save(fig, "01_solver_comparison")
 
@@ -631,79 +625,92 @@ def fig08_budget_utilization(results):
 
 
 def fig09_pareto(results):
-    """Pareto analysis: cost vs population."""
+    """Pareto analysis: cost vs population and cost vs energy (objective trade-offs)."""
     names, colors = _get_ordered(results)
-    fig, ax = plt.subplots(figsize=(9, 7))
+    fig, axes = plt.subplots(1, 2, figsize=(16, 7))
+
+    # Panel 1: Cost vs Population
+    ax = axes[0]
     for name in names:
         a = results[name]["analysis"]
         ax.scatter(a["total_cost"], a["total_population"],
                    s=200, c=SOLVER_COLORS[name], edgecolors="black",
-                   linewidth=1, zorder=3)
+                   linewidth=1, zorder=3, label=name)
         ax.annotate(name, (a["total_cost"], a["total_population"]),
                     fontsize=8, ha="left", va="bottom",
                     xytext=(8, 4), textcoords="offset points")
     ax.axvline(BUDGET, color="red", linestyle="--", alpha=0.5,
                label=f"Budget = ${BUDGET:,}")
-    ax.axhline(MIN_POPULATION, color="blue", linestyle="--", alpha=0.5,
-               label=f"Min Pop = {MIN_POPULATION:,}")
     ax.set_xlabel("Total Cost (USD)")
     ax.set_ylabel("Total Population Coverage")
-    ax.set_title("Pareto Analysis: Cost vs Population", fontweight="bold")
-    ax.legend()
+    ax.set_title("Cost vs Population Coverage", fontweight="bold")
+    ax.legend(fontsize=8)
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(
         lambda x, _: f"${x:,.0f}"))
     ax.grid(True, alpha=0.3)
+
+    # Panel 2: Cost vs Energy
+    ax = axes[1]
+    for name in names:
+        a = results[name]["analysis"]
+        ax.scatter(a["total_cost"], a["total_energy"],
+                   s=200, c=SOLVER_COLORS[name], edgecolors="black",
+                   linewidth=1, zorder=3, label=name)
+        ax.annotate(name, (a["total_cost"], a["total_energy"]),
+                    fontsize=8, ha="left", va="bottom",
+                    xytext=(8, 4), textcoords="offset points")
+    ax.axvline(BUDGET, color="red", linestyle="--", alpha=0.5,
+               label=f"Budget = ${BUDGET:,}")
+    ax.set_xlabel("Total Cost (USD)")
+    ax.set_ylabel("Total Energy Capacity (kWh/day)")
+    ax.set_title("Cost vs Energy Capacity", fontweight="bold")
+    ax.legend(fontsize=8)
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(
+        lambda x, _: f"${x:,.0f}"))
+    ax.grid(True, alpha=0.3)
+
+    fig.suptitle("Pareto Analysis: Objective Trade-offs", fontsize=14,
+                 fontweight="bold")
     fig.tight_layout()
-    _save(fig, "09_pareto_cost_vs_population")
+    _save(fig, "09_pareto_objective_tradeoffs")
 
 
-def fig10_constraint_satisfaction(results):
-    """Constraint satisfaction comparison."""
+def fig10_objective_achievement(results):
+    """Objective achievement: cost minimisation and population maximisation."""
     names, colors = _get_ordered(results)
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-    # Budget
+    # Panel 1: Cost Minimisation (objective: minimise)
     ax = axes[0]
     costs = [results[n]["analysis"]["total_cost"] for n in names]
-    bars = ax.bar(range(len(names)), costs, color=colors, edgecolor="black",
-                  linewidth=0.5)
+    ax.bar(range(len(names)), costs, color=colors, edgecolor="black",
+           linewidth=0.5)
     ax.axhline(BUDGET, color="red", linestyle="--", linewidth=1.5,
                label=f"Budget ${BUDGET:,}")
     ax.set_xticks(range(len(names)))
     ax.set_xticklabels(names, rotation=35, ha="right", fontsize=8)
-    ax.set_title("Budget Constraint", fontweight="bold")
+    ax.set_title("Cost Minimisation", fontweight="bold")
+    ax.set_ylabel("Total Installation Cost (USD)")
     ax.legend(fontsize=8)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(
         lambda x, _: f"${x:,.0f}"))
 
-    # Grid count
+    # Panel 2: Population Coverage Maximisation (objective: maximise)
     ax = axes[1]
-    nsites = [results[n]["analysis"]["num_sites"] for n in names]
-    ax.bar(range(len(names)), nsites, color=colors, edgecolor="black",
-           linewidth=0.5)
-    ax.axhline(MAX_GRIDS, color="red", linestyle="--", linewidth=1.5,
-               label=f"Max = {MAX_GRIDS}")
-    ax.set_xticks(range(len(names)))
-    ax.set_xticklabels(names, rotation=35, ha="right", fontsize=8)
-    ax.set_title("Grid Count Constraint", fontweight="bold")
-    ax.legend(fontsize=8)
-
-    # Population
-    ax = axes[2]
     pops = [results[n]["analysis"]["total_population"] for n in names]
     ax.bar(range(len(names)), pops, color=colors, edgecolor="black",
            linewidth=0.5)
-    ax.axhline(MIN_POPULATION, color="blue", linestyle="--", linewidth=1.5,
-               label=f"Min = {MIN_POPULATION:,}")
     ax.set_xticks(range(len(names)))
     ax.set_xticklabels(names, rotation=35, ha="right", fontsize=8)
-    ax.set_title("Population Constraint", fontweight="bold")
-    ax.legend(fontsize=8)
+    ax.set_title("Population Coverage Maximisation", fontweight="bold")
+    ax.set_ylabel("Total Population Covered")
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(
+        lambda x, _: f"{x:,.0f}"))
 
-    fig.suptitle("Constraint Satisfaction by Solver", fontsize=14,
+    fig.suptitle("Objective Achievement by Solver", fontsize=14,
                  fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.94])
-    _save(fig, "10_constraint_satisfaction")
+    _save(fig, "10_objective_achievement")
 
 
 def fig11_site_distributions(df):
@@ -829,6 +836,29 @@ def fig14_solution_heatmap(results, df):
     _save(fig, "14_solution_heatmap")
 
 
+def fig15_energy_produced(results, df):
+    """Daily energy capacity secured by each solver (objective: maximise)."""
+    names, colors = _get_ordered(results)
+    energies = [results[n]["analysis"]["total_energy"] for n in names]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    # Explicit per-bar loop so every bar gets exactly its solver colour.
+    for i, (name, energy, color) in enumerate(zip(names, energies, colors)):
+        ax.barh(i, energy, color=color, edgecolor="black", linewidth=0.5)
+        ax.text(energy + max(energies) * 0.01, i, f"{energy:,.0f} kWh/day",
+                va="center", fontsize=8)
+
+    ax.set_yticks(range(len(names)))
+    ax.set_yticklabels(names)
+    ax.set_xlabel("Total Energy Capacity (kWh/day)")
+    ax.set_title("Daily Energy Capacity Secured by Solver", fontweight="bold")
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(
+        lambda x, _: f"{x:,.0f}"))
+    ax.set_xlim(left=0)
+    fig.tight_layout()
+    _save(fig, "15_energy_produced")
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  MAIN
 # ═════════════════════════════════════════════════════════════════════════════
@@ -841,8 +871,8 @@ def main():
                         help="IBM backend for real hardware QAOA (e.g. ibm_torino)")
     parser.add_argument("--load", type=str, default=None,
                         help="Load results from JSON instead of re-running solvers")
-    parser.add_argument("--save_results", type=str, default="solver_results.json",
-                        help="Save solver results to this JSON file")
+    parser.add_argument("--save_results", "--save_result", type=str, default="solver_results.json",
+                        help="Save solver results to this JSON file (or inside a directory path)")
     parser.add_argument("--qaoa_local_sites", type=int, default=12,
                         help="Number of sites for local QAOA simulation")
     args = parser.parse_args()
@@ -904,9 +934,20 @@ def main():
                           if k != "selected_sites"},
             "time":      data["time"],
         }
-    with open(args.save_results, "w") as f:
-        json.dump(serializable, f, indent=2)
-    print(f"\nResults saved to {args.save_results}")
+    save_target = Path(args.save_results)
+    if save_target.exists() and save_target.is_dir():
+        save_path = save_target / "solver_results.json"
+    else:
+        save_path = save_target
+        if save_path.parent and not save_path.parent.exists():
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with open(save_path, "w") as f:
+            json.dump(serializable, f, indent=2)
+        print(f"\nResults saved to {save_path}")
+    except OSError as e:
+        print(f"\nWARNING: Could not save results to {save_path}: {e}")
 
     print(f"\n{len(results)} solvers completed. Generating figures...\n")
 
@@ -918,10 +959,11 @@ def main():
         fig05_consensus(results, df)
         fig08_budget_utilization(results)
         fig09_pareto(results)
-        fig10_constraint_satisfaction(results)
+        fig10_objective_achievement(results)
         fig12_efficiency(results, df)
         fig13_radar(results)
         fig14_solution_heatmap(results, df)
+        fig15_energy_produced(results, df)
 
     # These don't need multiple solvers
     fig03_geographic_all(df)
