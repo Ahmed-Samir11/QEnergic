@@ -5,9 +5,13 @@ Run all available solvers on the 50-site Ethiopia dataset and generate
 publication-quality figures for the research paper.
 
 Usage:
-    python generate_plots.py                          # run all local solvers
-    python generate_plots.py --ibm_backend ibm_torino # also run QAOA on real hardware
-    python generate_plots.py --load results.json      # load previously saved results
+    python generate_plots.py                            # run all local solvers
+    python generate_plots.py --ibm_backend ibm_torino   # also run QAOA on real hardware
+    python generate_plots.py --load results.json        # load previously saved results (JSON)
+    python generate_plots.py --from_csv results.csv     # load previously saved results (CSV)
+    python generate_plots.py --from_csv results.csv --solvers "NAR Greedy,Sim. Annealing"
+    python generate_plots.py --from_csv results.csv --rerun "D-Wave Neal"  # re-run one solver
+    python generate_plots.py --no_qaoa_local            # skip local QAOA simulation
 """
 
 import argparse
@@ -44,7 +48,7 @@ SOLVER_COLORS = {
     "Sim. Annealing":   "#228833",
     "Tabu Search":      "#CCBB44",
     "D-Wave Neal":      "#66CCEE",
-    "QAOA (hardware)":  "#AA3377",
+    "QAOA (IBM Torino)": "#AA3377",
 }
 
 SOLVER_ORDER = list(SOLVER_COLORS.keys())
@@ -122,8 +126,9 @@ def run_sa(df, Q):
 
 
 def run_dwave_neal(df, Q):
-    """D-Wave Neal simulated annealing (quantum-inspired)."""
-    import dimod, neal
+    """D-Wave simulated annealing via dwave-samplers (quantum-inspired)."""
+    import dimod
+    from dwave.samplers import SimulatedAnnealingSampler
     n = Q.shape[0]
     linear = {i: float(Q[i, i]) for i in range(n)}
     quadratic = {}
@@ -133,7 +138,7 @@ def run_dwave_neal(df, Q):
             if c != 0:
                 quadratic[(i, j)] = c
     bqm = dimod.BinaryQuadraticModel(linear, quadratic, 0.0, dimod.BINARY)
-    sampler = neal.SimulatedAnnealingSampler()
+    sampler = SimulatedAnnealingSampler()
     # num_reads=100 matches the 100-restart budget given to Sim. Annealing
     ss = sampler.sample(bqm, num_reads=100, num_sweeps=5000, seed=42)
     best = ss.first
@@ -320,7 +325,41 @@ def run_tabu(df, Q):
 #  MASTER RUNNER
 # ═════════════════════════════════════════════════════════════════════════════
 
-def run_all_solvers(df, Q, ibm_backend=None, qaoa_local_sites=12):
+def _save_csv(results, path):
+    """Save solver results to CSV so figures can be regenerated without re-running solvers."""
+    rows = []
+    for name, data in results.items():
+        a = data["analysis"]
+        rows.append({
+            "solver":           name,
+            "num_sites":        a["num_sites"],
+            "total_cost":       a["total_cost"],
+            "total_population": a["total_population"],
+            "total_energy":     a["total_energy"],
+            "budget_used_pct":  round(a["total_cost"] / BUDGET * 100, 2),
+            "time_sec":         round(data["time"], 4),
+            "solution":         " ".join(str(int(v)) for v in data["solution"]),
+        })
+    pd.DataFrame(rows).to_csv(path, index=False)
+    print(f"Results also saved to {path}")
+
+
+def _load_csv(path, df):
+    """Load solver results from CSV and reconstruct analysis from the solution vector."""
+    results = {}
+    frame = pd.read_csv(path)
+    for _, row in frame.iterrows():
+        x = np.array([float(v) for v in str(row["solution"]).split()])
+        analysis = analyze_solution(x, df)
+        results[str(row["solver"])] = {
+            "solution": x,
+            "analysis": analysis,
+            "time":     float(row["time_sec"]),
+        }
+    return results
+
+
+def run_all_solvers(df, Q, ibm_backend=None, qaoa_local_sites=12, run_qaoa_local=True):
     """Run every available solver and return {name: {solution, analysis, time}}."""
     results = {}
 
@@ -347,24 +386,25 @@ def run_all_solvers(df, Q, ibm_backend=None, qaoa_local_sites=12):
         except Exception as e:
             print(f"FAILED: {e}")
 
-    # QAOA local (reduced problem)
-    print(f"  Running QAOA (local, {qaoa_local_sites} sites)...", end=" ", flush=True)
-    t0 = time.time()
-    try:
-        # Use the first N rows of the original df so site indices align
-        # correctly when the solution is evaluated against the full dataset.
-        df_small = df.iloc[:qaoa_local_sites].reset_index(drop=True)
-        Q_small, _ = build_qubo(df_small, BUDGET, MAX_GRIDS, MIN_POPULATION)
-        x = run_qaoa_local(df, Q_small, qaoa_local_sites)
-        elapsed = time.time() - t0
-        analysis = analyze_solution(x, df)
-        results["QAOA (local)"] = {"solution": x, "analysis": analysis,
-                                   "time": elapsed,
-                                   "note": f"{qaoa_local_sites}-site subset"}
-        print(f"{elapsed:.2f}s  [{analysis['num_sites']} sites, "
-              f"${analysis['total_cost']:,}]")
-    except Exception as e:
-        print(f"FAILED: {e}")
+    # QAOA local (reduced problem) — skipped when run_qaoa_local=False
+    if run_qaoa_local:
+        print(f"  Running QAOA (local, {qaoa_local_sites} sites)...", end=" ", flush=True)
+        t0 = time.time()
+        try:
+            # Use the first N rows of the original df so site indices align
+            # correctly when the solution is evaluated against the full dataset.
+            df_small = df.iloc[:qaoa_local_sites].reset_index(drop=True)
+            Q_small, _ = build_qubo(df_small, BUDGET, MAX_GRIDS, MIN_POPULATION)
+            x = run_qaoa_local(df, Q_small, qaoa_local_sites)
+            elapsed = time.time() - t0
+            analysis = analyze_solution(x, df)
+            results["QAOA (local)"] = {"solution": x, "analysis": analysis,
+                                       "time": elapsed,
+                                       "note": f"{qaoa_local_sites}-site subset"}
+            print(f"{elapsed:.2f}s  [{analysis['num_sites']} sites, "
+                  f"${analysis['total_cost']:,}]")
+        except Exception as e:
+            print(f"FAILED: {e}")
 
     # QAOA hardware (full 50 sites)
     if ibm_backend:
@@ -374,7 +414,7 @@ def run_all_solvers(df, Q, ibm_backend=None, qaoa_local_sites=12):
             x = run_qaoa_hardware(df, Q, ibm_backend)
             elapsed = time.time() - t0
             analysis = analyze_solution(x, df)
-            results["QAOA (hardware)"] = {"solution": x, "analysis": analysis,
+            results["QAOA (IBM Torino)"] = {"solution": x, "analysis": analysis,
                                           "time": elapsed,
                                           "backend": ibm_backend}
             print(f"  {elapsed:.2f}s  [{analysis['num_sites']} sites, "
@@ -870,11 +910,23 @@ def main():
     parser.add_argument("--ibm_backend", type=str, default=None,
                         help="IBM backend for real hardware QAOA (e.g. ibm_torino)")
     parser.add_argument("--load", type=str, default=None,
-                        help="Load results from JSON instead of re-running solvers")
+                        help="Load results from a JSON file instead of re-running solvers")
+    parser.add_argument("--from_csv", type=str, default=None,
+                        help="Load results from a CSV file instead of re-running solvers")
+    parser.add_argument("--solvers", type=str, default=None,
+                        help="Comma-separated solver names to include in figures when loading "
+                             "from CSV or JSON (e.g. \"NAR Greedy,Sim. Annealing\"). "
+                             "Omit to include all saved solvers.")
     parser.add_argument("--save_results", "--save_result", type=str, default="solver_results.json",
                         help="Save solver results to this JSON file (or inside a directory path)")
     parser.add_argument("--qaoa_local_sites", type=int, default=12,
                         help="Number of sites for local QAOA simulation")
+    parser.add_argument("--no_qaoa_local", action="store_true",
+                        help="Skip local QAOA simulation (useful when only hardware QAOA is needed)")
+    parser.add_argument("--rerun", type=str, default=None,
+                        help="Comma-separated solver names to re-run fresh (must be used with "
+                             "--from_csv or --load to load the rest from cache). "
+                             'e.g. --rerun \'D-Wave Neal\'')
     args = parser.parse_args()
 
     os.makedirs(FIGURES_DIR, exist_ok=True)
@@ -890,7 +942,51 @@ def main():
     print()
 
     # ── Run or load solvers ──────────────────────────────────────────────
-    if args.load and os.path.exists(args.load):
+    # Map of solver name → callable, used by --rerun
+    _SOLVER_FNS = {
+        "NAR Greedy":     lambda: run_nar(df),
+        "Sim. Annealing": lambda: run_sa(df, Q),
+        "Tabu Search":    lambda: run_tabu(df, Q),
+        "D-Wave Neal":    lambda: run_dwave_neal(df, Q),
+        "QAOA (IBM Torino)": lambda: run_qaoa_hardware(df, Q, args.ibm_backend),
+    }
+
+    def _run_one(name):
+        """Run a single named solver and return its results dict entry."""
+        fn = _SOLVER_FNS.get(name)
+        if fn is None:
+            print(f"  Unknown solver '{name}' -- skipping")
+            return None
+        print(f"  Re-running {name}...", end=" ", flush=True)
+        t0 = time.time()
+        try:
+            x = fn()
+            elapsed = time.time() - t0
+            if x is None:
+                print("SKIPPED (not installed)")
+                return None
+            analysis = analyze_solution(x, df)
+            print(f"{elapsed:.2f}s  [{analysis['num_sites']} sites, ${analysis['total_cost']:,}]")
+            return {"solution": x, "analysis": analysis, "time": elapsed}
+        except Exception as e:
+            print(f"FAILED: {e}")
+            return None
+
+    if args.from_csv and os.path.exists(args.from_csv):
+        print(f"Loading results from {args.from_csv}...")
+        results = _load_csv(args.from_csv, df)
+        # --rerun: replace specific solvers with a fresh run
+        if args.rerun:
+            for name in [s.strip() for s in args.rerun.split(",")]:
+                entry = _run_one(name)
+                if entry is not None:
+                    results[name] = entry
+        # --ibm_backend: run hardware QAOA and merge
+        if args.ibm_backend and "QAOA (IBM Torino)" not in results:
+            entry = _run_one("QAOA (IBM Torino)")
+            if entry is not None:
+                results["QAOA (IBM Torino)"] = entry
+    elif args.load and os.path.exists(args.load):
         print(f"Loading results from {args.load}...")
         with open(args.load, "r") as f:
             saved = json.load(f)
@@ -901,28 +997,34 @@ def main():
                 "analysis": data["analysis"],
                 "time":     data["time"],
             }
-        # If --ibm_backend was also given, run hardware QAOA and merge
-        if args.ibm_backend and "QAOA (hardware)" not in results:
-            print(f"\nRunning QAOA on hardware ({args.ibm_backend})...")
-            t0 = time.time()
-            try:
-                x = run_qaoa_hardware(df, Q, args.ibm_backend)
-                elapsed = time.time() - t0
-                analysis = analyze_solution(x, df)
-                results["QAOA (hardware)"] = {
-                    "solution": x, "analysis": analysis,
-                    "time": elapsed, "backend": args.ibm_backend,
-                }
-                print(f"  {elapsed:.2f}s  [{analysis['num_sites']} sites, "
-                      f"${analysis['total_cost']:,}]")
-            except Exception as e:
-                print(f"  FAILED: {e}")
+        # --rerun: replace specific solvers with a fresh run
+        if args.rerun:
+            for name in [s.strip() for s in args.rerun.split(",")]:
+                entry = _run_one(name)
+                if entry is not None:
+                    results[name] = entry
+        # --ibm_backend: run hardware QAOA and merge
+        if args.ibm_backend and "QAOA (IBM Torino)" not in results:
+            entry = _run_one("QAOA (IBM Torino)")
+            if entry is not None:
+                results["QAOA (IBM Torino)"] = entry
     else:
         print("Running solvers...")
         results = run_all_solvers(df, Q, ibm_backend=args.ibm_backend,
-                                 qaoa_local_sites=args.qaoa_local_sites)
+                                  qaoa_local_sites=args.qaoa_local_sites,
+                                  run_qaoa_local=not args.no_qaoa_local)
 
-    # Save / re-save results
+    # ── Apply --solvers filter ───────────────────────────────────────────
+    if args.solvers:
+        keep = {s.strip() for s in args.solvers.split(",")}
+        removed = [n for n in list(results) if n not in keep]
+        for n in removed:
+            del results[n]
+        if removed:
+            print(f"  Filtered out: {', '.join(removed)}")
+        print(f"  Plotting {len(results)} solver(s): {', '.join(results)}")
+
+    # ── Save / re-save results ───────────────────────────────────────────
     serializable = {}
     for name, data in results.items():
         serializable[name] = {
@@ -946,6 +1048,9 @@ def main():
         with open(save_path, "w") as f:
             json.dump(serializable, f, indent=2)
         print(f"\nResults saved to {save_path}")
+        # Also write CSV alongside the JSON
+        csv_path = save_path.with_suffix(".csv")
+        _save_csv(results, csv_path)
     except OSError as e:
         print(f"\nWARNING: Could not save results to {save_path}: {e}")
 
