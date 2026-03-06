@@ -10,3 +10,5 @@ paper.tex
 # Python caches
 __pycache__/
 *.pyc
+
+figures/

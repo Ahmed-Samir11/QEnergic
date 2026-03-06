@@ -1,17 +1,82 @@
 #!/usr/bin/env python3
 # generate_plots.py
 """
-Run all available solvers on the 50-site Ethiopia dataset and generate
-publication-quality figures for the research paper.
+Microgrid Optimization Solver Comparison & Visualization Tool
+==============================================================
 
-Usage:
-    python generate_plots.py                            # run all local solvers
-    python generate_plots.py --ibm_backend ibm_torino   # also run QAOA on real hardware
-    python generate_plots.py --load results.json        # load previously saved results (JSON)
-    python generate_plots.py --from_csv results.csv     # load previously saved results (CSV)
-    python generate_plots.py --from_csv results.csv --solvers "NAR Greedy,Sim. Annealing"
-    python generate_plots.py --from_csv results.csv --rerun "D-Wave Neal"  # re-run one solver
-    python generate_plots.py --no_qaoa_local            # skip local QAOA simulation
+This script runs multiple optimization solvers (classical, quantum-inspired, and quantum hardware)
+on the 50-site Ethiopia microgrid placement problem and generates publication-quality figures
+for the Q-Energic research paper.
+
+SOLVERS AVAILABLE
+-----------------
+  • NAR Greedy          : Greedy heuristic (population/cost ratio)
+  • Simulated Annealing : Classical metaheuristic (100 restarts)
+  • Tabu Search         : Classical metaheuristic (100 reads)
+  • D-Wave Neal         : Quantum-inspired simulated annealing (dwave.samplers)
+  • QAOA (IBM Torino)   : Gate-based quantum optimization on IBM Quantum hardware
+
+COMMAND-LINE ARGUMENTS
+----------------------
+  --budget <int>              : Maximum installation budget (default: 900,000 USD)
+  --max_grids <int>           : Maximum number of microgrids (default: 10)
+  --min_population <int>      : Minimum population coverage target (default: 5,000)
+  
+  --ibm_backend <name>        : Run QAOA on IBM Quantum hardware (e.g., 'ibm_torino')
+  --qaoa_local_sites <int>    : Number of sites for local QAOA simulation (default: 20)
+  --no_qaoa_local             : Skip local QAOA simulation entirely
+  
+  --load <path.json>          : Load saved results from JSON file (legacy format)
+  --from_csv <path.csv>       : Load saved results from CSV file (recommended)
+  --save_results <path>       : Save results to JSON + CSV (auto-generates both formats)
+  
+  --solvers "Name1,Name2"     : Filter which solvers appear in plots (comma-separated)
+  --rerun "Solver Name"       : Re-run specific solver(s) while loading others from CSV
+  
+  --record_progress           : Save per-iteration progress (for convergence plots)
+
+USAGE EXAMPLES
+--------------
+  1. Run all solvers locally (no quantum hardware):
+     $ python generate_plots.py
+
+  2. Run with quantum hardware (requires IBM Quantum credentials in .env.local):
+     $ python generate_plots.py --ibm_backend ibm_torino
+
+  3. Load cached results from CSV and regenerate all figures instantly:
+     $ python generate_plots.py --from_csv figures/solver_results.csv
+
+  4. Re-run only D-Wave Neal while loading other solvers from cache:
+     $ python generate_plots.py --from_csv figures/solver_results.csv --rerun "D-Wave Neal"
+
+  5. Generate plots for only selected solvers:
+     $ python generate_plots.py --from_csv figures/solver_results.csv --solvers "NAR Greedy,Sim. Annealing,QAOA (IBM Torino)"
+
+  6. Save results to custom location:
+     $ python generate_plots.py --save_results my_experiments/run_01
+
+  7. Skip local QAOA simulation (faster, only hardware QAOA if specified):
+     $ python generate_plots.py --ibm_backend ibm_torino --no_qaoa_local
+
+OUTPUT FILES
+------------
+  JSON + CSV : Solver results with metrics and binary solution vectors
+  Figures    : 15 publication-quality plots (PNG + PDF formats)
+               - 01_solver_comparison.png/pdf (3-panel bar chart)
+               - 09_pareto_objective_tradeoffs.png/pdf (2-panel scatter)
+               - 10_objective_achievement.png/pdf (2-panel bars)
+               - 15_energy_produced.png/pdf (horizontal bar chart)
+               - Plus 11 additional analysis figures (maps, heatmaps, radar, etc.)
+
+NOTES
+-----
+  • CSV format is recommended for caching (instant reload, no re-computation)
+  • Quantum hardware requires valid IBM_QUANTUM_INSTANCE_CRN in .env.local
+  • QAOA hardware experiments may take 3-5 minutes per run (queue + execution time)
+  • All figures use colorblind-friendly palettes
+  • Budget/population constraints are soft penalties in QUBO formulation
+
+For more details, see README.md and paper.tex in the repository root.
 """
 
 import argparse
