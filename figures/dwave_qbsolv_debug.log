@@ -516,3 +516,21 @@ wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.js
 --- run_dwave_qbsolv run start: Fri Apr  3 12:26:21 2026 max_iter=30
 wrote 30 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
 wrote 30 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Fri Apr  3 12:42:06 2026 max_iter=5
+
+--- run_dwave_qbsolv run start: Fri Apr  3 12:42:56 2026 max_iter=5
+
+--- run_dwave_qbsolv run start: Fri Apr  3 12:45:00 2026 max_iter=30
+
+--- run_dwave_qbsolv run start: Fri Apr  3 12:50:00 2026 max_iter=30
+
+--- run_dwave_qbsolv run start: Fri Apr  3 12:55:01 2026 max_iter=30
+
+--- run_dwave_qbsolv run start: Fri Apr  3 13:00:02 2026 max_iter=30
+
+--- run_dwave_qbsolv run start: Fri Apr  3 13:05:02 2026 max_iter=100
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+fig_dwave_trajectory failed: -1
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+fig_dwave_trajectory failed: -1

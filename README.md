@@ -82,7 +82,7 @@ Q(x) = Σ C_i x_i  −  α Σ P_i x_i  −  γ Σ E_i x_i
 | NAR Greedy | Classical domain heuristic | Population/cost ratio greedy; hard budget constraint |
 | Simulated Annealing | Classical metaheuristic | `simanneal`, 100 restarts, auto-calibrated temperature |
 | Tabu Search | Classical metaheuristic | D-Wave `TabuSampler`, 100 reads |
-| D-Wave Neal | Quantum-inspired SA | `dwave-neal`, 100 reads × 5,000 sweeps |
+| D-Wave QBSolv | Hybrid decomposition | `dwave-hybrid` decomposition + Tabu subproblem solver |
 | QAOA (hardware) | Gate-based quantum | IBM Quantum via Qiskit Runtime, `reps=1`, COBYLA optimizer, 5 iterations |
 
 ---
@@ -130,6 +130,21 @@ python generate_plots.py --load figures/solver_results.json
 ```
 
 All figures are written to `figures/` as PNG (150 dpi) and PDF (300 dpi).
+
+### Reproduce D-Wave QBSolv Result
+
+This repository includes a validated 100-iteration D-Wave profile that reproduces:
+
+- `num_sites = 6`
+- `total_cost = 908000`
+- `total_population = 6230`
+- `total_energy = 3750`
+
+Run:
+
+```powershell
+python generate_plots.py --from_csv figures/solver_results.csv --rerun "D-Wave QBSolv" --record_progress --dwave_max_iter 100 --dwave_subproblem_size 16 --dwave_num_reads 20 --dwave_timeout_ms 500 --save_results figures/solver_results.json
+```
 
 ---
 

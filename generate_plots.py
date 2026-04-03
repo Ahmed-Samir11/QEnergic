@@ -1008,16 +1008,14 @@ def fig_dwave_trajectory(progress, name="D-Wave QBSolv"):
             return np.zeros_like(s)
         return (s - mn) / (mx - mn)
 
-    # Normalize from raw `energy` values using the full progress series.
-    # This avoids artifacts introduced by incremental running-min/max
-    # normalization that can saturate values near 1.0 during the run.
+    # Use full-series normalization of raw energy for a stable visual shape.
+    # Keep direct min-max normalization to match prior trajectory visuals.
     if "energy" in dfp.columns:
-        energy_norm = _norm(dfp["energy"])
+        energy_norm = _norm(dfp["energy"]).to_numpy(dtype=float)
     elif "energy_norm" in dfp.columns:
-        # Fallback to stored energy_norm if energy column not available
-        energy_norm = dfp["energy_norm"].astype(float)
+        energy_norm = dfp["energy_norm"].astype(float).to_numpy()
     else:
-        energy_norm = np.zeros(len(dfp))
+        energy_norm = np.zeros(len(dfp), dtype=float)
 
     budget_norm = _norm(dfp["total_cost"]) if "total_cost" in dfp.columns else np.zeros(len(dfp))
     cost_change_norm = _norm(dfp["cost_change"]) if "cost_change" in dfp.columns else np.zeros(len(dfp))
@@ -1042,12 +1040,6 @@ def fig_dwave_trajectory(progress, name="D-Wave QBSolv"):
     else:
         ax.set_xlim(it.min() - 0.5, it.max() + 0.5)
 
-    # Annotate last point for clarity (keeps a marker-like label text)
-    last_idx = dfp.index[-1]
-    last_it = int(dfp.loc[last_idx, "iteration"])
-    last_energy = energy_norm.iloc[-1] if len(energy_norm) else 0.0
-    ax.annotate(f"iter {last_it}", xy=(last_it, last_energy), xytext=(5, 5),
-                textcoords='offset points', fontsize=10)
     # Place legend at the top-right (semi-transparent) to avoid hiding data
     ax.legend(loc="upper right", frameon=True, fontsize=9, framealpha=0.85)
     # Use default tight layout
