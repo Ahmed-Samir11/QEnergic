@@ -1,0 +1,518 @@
+
+--- run_dwave_qbsolv run start: Mon Mar 16 23:43:29 2026 max_iter=100
+branch.next failed at iter 2: mismatch between variables in 'initial_states' and 'bqm'
+Traceback (most recent call last):
+  File "E:\repos\QEnergic\generate_plots.py", line 264, in run_dwave_qbsolv
+    state = branch.next(state)
+            ^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\flow.py", line 133, in next
+    return state.result()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 413, in dispatch
+    new_state = self.next(state, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\samplers.py", line 493, in next
+    subsamples = self.sampler.sample(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dwave\samplers\tabu\sampler.py", line 198, in sample
+    parsed = self.parse_initial_states(bqm.binary,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dimod\core\initialized.py", line 134, in parse_initial_states
+    raise ValueError("mismatch between variables in "
+ValueError: mismatch between variables in 'initial_states' and 'bqm'
+
+retry failed at iter 2: mismatch between variables in 'initial_states' and 'bqm'
+Traceback (most recent call last):
+  File "E:\repos\QEnergic\generate_plots.py", line 264, in run_dwave_qbsolv
+    state = branch.next(state)
+            ^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\flow.py", line 133, in next
+    return state.result()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 413, in dispatch
+    new_state = self.next(state, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\samplers.py", line 493, in next
+    subsamples = self.sampler.sample(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dwave\samplers\tabu\sampler.py", line 198, in sample
+    parsed = self.parse_initial_states(bqm.binary,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dimod\core\initialized.py", line 134, in parse_initial_states
+    raise ValueError("mismatch between variables in "
+ValueError: mismatch between variables in 'initial_states' and 'bqm'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\repos\QEnergic\generate_plots.py", line 278, in run_dwave_qbsolv
+    state = branch.next(state)
+            ^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\flow.py", line 133, in next
+    return state.result()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 413, in dispatch
+    new_state = self.next(state, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\samplers.py", line 493, in next
+    subsamples = self.sampler.sample(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dwave\samplers\tabu\sampler.py", line 198, in sample
+    parsed = self.parse_initial_states(bqm.binary,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dimod\core\initialized.py", line 134, in parse_initial_states
+    raise ValueError("mismatch between variables in "
+ValueError: mismatch between variables in 'initial_states' and 'bqm'
+
+
+--- run_dwave_qbsolv run start: Mon Mar 16 23:45:23 2026 max_iter=100
+branch.next failed at iter 2: mismatch between variables in 'initial_states' and 'bqm'
+Traceback (most recent call last):
+  File "E:\repos\QEnergic\generate_plots.py", line 271, in run_dwave_qbsolv
+    state = branch.next(state)
+            ^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\flow.py", line 133, in next
+    return state.result()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 413, in dispatch
+    new_state = self.next(state, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\samplers.py", line 493, in next
+    subsamples = self.sampler.sample(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dwave\samplers\tabu\sampler.py", line 198, in sample
+    parsed = self.parse_initial_states(bqm.binary,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dimod\core\initialized.py", line 134, in parse_initial_states
+    raise ValueError("mismatch between variables in "
+ValueError: mismatch between variables in 'initial_states' and 'bqm'
+
+retry failed at iter 2: mismatch between variables in 'initial_states' and 'bqm'
+Traceback (most recent call last):
+  File "E:\repos\QEnergic\generate_plots.py", line 271, in run_dwave_qbsolv
+    state = branch.next(state)
+            ^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\flow.py", line 133, in next
+    return state.result()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 413, in dispatch
+    new_state = self.next(state, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\samplers.py", line 493, in next
+    subsamples = self.sampler.sample(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dwave\samplers\tabu\sampler.py", line 198, in sample
+    parsed = self.parse_initial_states(bqm.binary,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dimod\core\initialized.py", line 134, in parse_initial_states
+    raise ValueError("mismatch between variables in "
+ValueError: mismatch between variables in 'initial_states' and 'bqm'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\repos\QEnergic\generate_plots.py", line 285, in run_dwave_qbsolv
+    state = branch.next(state)
+            ^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\flow.py", line 133, in next
+    return state.result()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 413, in dispatch
+    new_state = self.next(state, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\samplers.py", line 493, in next
+    subsamples = self.sampler.sample(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dwave\samplers\tabu\sampler.py", line 198, in sample
+    parsed = self.parse_initial_states(bqm.binary,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dimod\core\initialized.py", line 134, in parse_initial_states
+    raise ValueError("mismatch between variables in "
+ValueError: mismatch between variables in 'initial_states' and 'bqm'
+
+
+--- run_dwave_qbsolv run start: Mon Mar 16 23:46:21 2026 max_iter=100
+
+--- run_dwave_qbsolv run start: Tue Mar 17 00:36:58 2026 max_iter=10
+wrote 10 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+wrote 10 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Tue Mar 17 00:37:47 2026 max_iter=100
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Tue Mar 17 22:16:20 2026 max_iter=10
+wrote 10 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+wrote 10 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Tue Mar 17 22:52:15 2026 max_iter=100
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Tue Mar 17 22:59:12 2026 max_iter=100
+
+--- run_dwave_qbsolv run start: Tue Mar 17 23:28:59 2026 max_iter=100
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Tue Mar 17 23:46:27 2026 max_iter=100
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Wed Mar 18 01:00:59 2026 max_iter=100
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Wed Mar 18 03:17:18 2026 max_iter=100
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Wed Mar 18 12:13:59 2026 max_iter=30
+wrote 30 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress_fast.json
+wrote 30 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Wed Mar 18 12:14:36 2026 max_iter=30
+wrote 30 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress_moderate.json
+wrote 30 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Wed Mar 18 12:19:38 2026 max_iter=30
+branch.next failed at iter 2: mismatch between variables in 'initial_states' and 'bqm'
+Traceback (most recent call last):
+  File "E:\repos\QEnergic\generate_plots.py", line 318, in run_dwave_qbsolv
+    state = branch.next(state)
+            ^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\flow.py", line 133, in next
+    return state.result()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 413, in dispatch
+    new_state = self.next(state, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\samplers.py", line 493, in next
+    subsamples = self.sampler.sample(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dwave\samplers\tabu\sampler.py", line 198, in sample
+    parsed = self.parse_initial_states(bqm.binary,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dimod\core\initialized.py", line 134, in parse_initial_states
+    raise ValueError("mismatch between variables in "
+ValueError: mismatch between variables in 'initial_states' and 'bqm'
+
+retry failed at iter 2: mismatch between variables in 'initial_states' and 'bqm'
+Traceback (most recent call last):
+  File "E:\repos\QEnergic\generate_plots.py", line 318, in run_dwave_qbsolv
+    state = branch.next(state)
+            ^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\flow.py", line 133, in next
+    return state.result()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 413, in dispatch
+    new_state = self.next(state, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\samplers.py", line 493, in next
+    subsamples = self.sampler.sample(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dwave\samplers\tabu\sampler.py", line 198, in sample
+    parsed = self.parse_initial_states(bqm.binary,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dimod\core\initialized.py", line 134, in parse_initial_states
+    raise ValueError("mismatch between variables in "
+ValueError: mismatch between variables in 'initial_states' and 'bqm'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\repos\QEnergic\generate_plots.py", line 332, in run_dwave_qbsolv
+    state = branch.next(state)
+            ^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\flow.py", line 133, in next
+    return state.result()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 403, in dispatch
+    return self.error(exc)
+           ^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 375, in error
+    raise exc
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 400, in dispatch
+    state = future.result()
+            ^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Compumarts\AppData\Local\Programs\Python\Python311\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\concurrency.py", line 55, in submit
+    return Present(result=fn(*args, **kwargs))
+                          ^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\core.py", line 413, in dispatch
+    new_state = self.next(state, **kwargs)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\hybrid\samplers.py", line 493, in next
+    subsamples = self.sampler.sample(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dwave\samplers\tabu\sampler.py", line 198, in sample
+    parsed = self.parse_initial_states(bqm.binary,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\repos\QEnergic\quantum\Lib\site-packages\dimod\core\initialized.py", line 134, in parse_initial_states
+    raise ValueError("mismatch between variables in "
+ValueError: mismatch between variables in 'initial_states' and 'bqm'
+
+wrote 1 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress_strong.json
+fig_dwave_trajectory failed: 'numpy.ndarray' object has no attribute 'iloc'
+wrote 1 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+fig_dwave_trajectory failed: 'numpy.ndarray' object has no attribute 'iloc'
+
+--- run_dwave_qbsolv run start: Wed Mar 18 13:28:00 2026 max_iter=100
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress_100.json
+wrote 100 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+
+--- run_dwave_qbsolv run start: Fri Apr  3 12:26:21 2026 max_iter=30
+wrote 30 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json
+wrote 30 progress entries to E:\repos\QEnergic\figures\dwave_qbsolv_progress.json

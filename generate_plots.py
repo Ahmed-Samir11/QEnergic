@@ -13,7 +13,7 @@ SOLVERS AVAILABLE
   • NAR Greedy          : Greedy heuristic (population/cost ratio)
   • Simulated Annealing : Classical metaheuristic (100 restarts)
   • Tabu Search         : Classical metaheuristic (100 reads)
-  • D-Wave Neal         : Quantum-inspired simulated annealing (dwave.samplers)
+    • D-Wave QBSolv       : QBSolv-based solver (dwave-qbsolv)
   • QAOA (IBM Torino)   : Gate-based quantum optimization on IBM Quantum hardware
 
 COMMAND-LINE ARGUMENTS
@@ -46,8 +46,8 @@ USAGE EXAMPLES
   3. Load cached results from CSV and regenerate all figures instantly:
      $ python generate_plots.py --from_csv figures/solver_results.csv
 
-  4. Re-run only D-Wave Neal while loading other solvers from cache:
-     $ python generate_plots.py --from_csv figures/solver_results.csv --rerun "D-Wave Neal"
+  4. Re-run only D-Wave QBSolv while loading other solvers from cache:
+      $ python generate_plots.py --from_csv figures/solver_results.csv --rerun "D-Wave QBSolv"
 
   5. Generate plots for only selected solvers:
      $ python generate_plots.py --from_csv figures/solver_results.csv --solvers "NAR Greedy,Sim. Annealing,QAOA (IBM Torino)"
@@ -112,7 +112,7 @@ SOLVER_COLORS = {
     "NAR Greedy":       "#4477AA",
     "Sim. Annealing":   "#228833",
     "Tabu Search":      "#CCBB44",
-    "D-Wave Neal":      "#66CCEE",
+    "D-Wave QBSolv":      "#66CCEE",
     "QAOA (IBM Torino)": "#AA3377",
 }
 
@@ -168,7 +168,7 @@ def run_sa(df, Q):
             return float(x @ self.Q @ x)
 
     # 100 independent restarts; return best solution found across all runs.
-    # Matches the multi-read budget of D-Wave Neal for a fair comparison.
+    # Matches the multi-read budget of D-Wave QBSolv for a fair comparison.
     rng = np.random.RandomState(42)
     best_energy = float("inf")
     best_state = None
@@ -190,11 +190,38 @@ def run_sa(df, Q):
     return np.array(best_state, dtype=float)
 
 
-def run_dwave_neal(df, Q):
-    """D-Wave simulated annealing via dwave-samplers (quantum-inspired)."""
+def run_dwave_qbsolv(
+    df,
+    Q,
+    max_iterations=100,
+    record_progress=False,
+    subproblem_size=None,
+    num_reads=None,
+    timeout_ms=None,
+    progress_out_path=None,
+    clear_subsamples=True,
+):
+    """D-Wave QBSolv-like runner using `dwave-hybrid` Tabu decomposition.
+
+    Parameters
+    - df, Q: dataset and QUBO matrix
+    - max_iterations: number of hybrid decomposition iterations to run
+    - record_progress: if True, save per-iteration metrics and draw trajectory
+
+    Returns a binary solution vector (numpy array) or `None` if hybrid
+    primitives are unavailable.
+    """
+    # Try to import hybrid primitives (optional dependency)
+    try:
+        from hybrid import EnergyImpactDecomposer, TabuSubproblemSampler, SplatComposer
+        from hybrid.core import State, Runnable, SampleSet
+    except Exception:
+        return None
+
     import dimod
-    from dwave.samplers import SimulatedAnnealingSampler
+
     n = Q.shape[0]
+    # Build a dimod BinaryQuadraticModel from the numpy Q matrix (BINARY vartype)
     linear = {i: float(Q[i, i]) for i in range(n)}
     quadratic = {}
     for i in range(n):
@@ -203,11 +230,269 @@ def run_dwave_neal(df, Q):
             if c != 0:
                 quadratic[(i, j)] = c
     bqm = dimod.BinaryQuadraticModel(linear, quadratic, 0.0, dimod.BINARY)
-    sampler = SimulatedAnnealingSampler()
-    # num_reads=100 matches the 100-restart budget given to Sim. Annealing
-    ss = sampler.sample(bqm, num_reads=100, num_sweeps=5000, seed=42)
-    best = ss.first
-    return np.array([best.sample[i] for i in range(n)], dtype=float)
+
+    # Hybrid decomposition / sampling parameters (tunable)
+    # Default (fast) settings; can be overridden via function args.
+    default_subproblem_size = min(max(6, n // 3), n)
+    default_num_reads = 4
+    default_timeout_ms = 100
+
+    if subproblem_size is None:
+        subproblem_size = default_subproblem_size
+    if num_reads is None:
+        num_reads = default_num_reads
+    if timeout_ms is None:
+        timeout_ms = default_timeout_ms
+
+    # Small helper to clear subsamples after splatting so subsequent
+    # decomposer iterations don't reuse incompatible subsamples.
+    class _ClearSubsamples(Runnable):
+        def next(self, state, **runopts):
+            return state.updated(subsamples=None)
+
+    # Branch: choose high-impact variables, solve subproblems with Tabu,
+    # then splat subsolutions back into global sampleset. Optionally clear
+    # subsamples between iterations to avoid `initial_states` mismatches.
+    branch = (
+        EnergyImpactDecomposer(size=subproblem_size)
+        | TabuSubproblemSampler(num_reads=num_reads, timeout=timeout_ms)
+        | SplatComposer()
+    )
+    if clear_subsamples:
+        branch = branch | _ClearSubsamples()
+
+    # Initial state (uses hybrid.utils.min_sample by default)
+    state = State.from_problem(bqm)
+    best_sampleset = state.samples
+    try:
+        initial_energy = float(state.samples.first.energy)
+    except Exception:
+        initial_energy = None
+    try:
+        best_energy = float(best_sampleset.first.energy)
+    except Exception:
+        best_energy = float("inf")
+
+    progress = []
+    prev_cost = None
+    debug_log = os.path.join(FIGURES_DIR, "dwave_qbsolv_debug.log")
+    out_path = progress_out_path if progress_out_path else os.path.join(FIGURES_DIR, "dwave_qbsolv_progress.json")
+
+    def _atomic_write_json(data, path):
+        tmp = path + ".tmp"
+        try:
+            with open(tmp, "w") as f:
+                json.dump(data, f, indent=2)
+                f.flush()
+                try:
+                    os.fsync(f.fileno())
+                except Exception:
+                    pass
+            os.replace(tmp, path)
+        except Exception as e:
+            try:
+                with open(debug_log, "a") as _f:
+                    _f.write(f"atomic write failed: {e}\n")
+            except Exception:
+                pass
+
+    # energy range trackers for normalization
+    energy_min = initial_energy if initial_energy is not None else float("inf")
+    energy_max = initial_energy if initial_energy is not None else float("-inf")
+
+    # write a short header for each run
+    try:
+        with open(debug_log, "a") as _f:
+            _f.write(f"\n--- run_dwave_qbsolv run start: {time.asctime()} max_iter={max_iterations}\n")
+    except Exception:
+        pass
+
+    # Iteratively run the branch to improve the global sample using subproblem
+    # tabu search. Keep the best sample seen across iterations and record
+    # per-iteration metrics if requested. We ensure progress is persisted to
+    # disk on every iteration (atomic write) and once more on exit so partial
+    # runs are preserved.
+    try:
+        for it in range(1, max_iterations + 1):
+            try:
+                state = branch.next(state)
+            except Exception as e:
+                # Log exception and attempt one retry before giving up
+                import traceback
+                tb = traceback.format_exc()
+                msg = f"branch.next failed at iter {it}: {e}\n{tb}\n"
+                print(msg)
+                try:
+                    with open(debug_log, "a") as f:
+                        f.write(msg)
+                except Exception:
+                    pass
+                # one retry
+                try:
+                    state = branch.next(state)
+                except Exception as e2:
+                    tb2 = traceback.format_exc()
+                    msg2 = f"retry failed at iter {it}: {e2}\n{tb2}\n"
+                    print(msg2)
+                    try:
+                        with open(debug_log, "a") as f:
+                            f.write(msg2)
+                    except Exception:
+                        pass
+                    break
+
+            sampleset = state.samples
+            try:
+                energy = float(sampleset.first.energy)
+            except Exception as e:
+                # Log and continue to next iteration
+                import traceback
+                tb = traceback.format_exc()
+                msg = f"failed to read energy at iter {it}: {e}\n{tb}\n"
+                print(msg)
+                try:
+                    with open(debug_log, "a") as f:
+                        f.write(msg)
+                except Exception:
+                    pass
+                continue
+
+            if energy < best_energy:
+                best_energy = energy
+                best_sampleset = sampleset
+
+            # Extract the current best sample and compute analysis metrics
+            sample_map = sampleset.first.sample
+            x = np.array([sample_map.get(i, 0) for i in range(n)], dtype=float)
+            analysis = analyze_solution(x, df)
+            total_cost = float(analysis.get("total_cost", 0.0))
+            total_population = float(analysis.get("total_population", 0.0))
+            num_sites = int(analysis.get("num_sites", 0))
+            budget_used_pct = total_cost / BUDGET * 100
+
+            cost_change = abs(total_cost - prev_cost) if prev_cost is not None else 0.0
+            prev_cost = total_cost
+
+            # Dynamic energy normalization using min/max energies seen so far.
+            #  - 0 corresponds to the worst-seen (highest) energy
+            #  - 1 corresponds to the best-seen (lowest) energy
+            # Update running min/max before normalizing.
+            if energy < energy_min:
+                energy_min = energy
+            if energy > energy_max:
+                energy_max = energy
+
+            denom = energy_max - energy_min
+            if denom > 1e-12:
+                energy_norm = (energy_max - energy) / denom
+                energy_norm = max(0.0, min(1.0, energy_norm))
+            else:
+                energy_norm = 0.0
+
+            progress.append({
+                "iteration": it,
+                "energy": energy,
+                "energy_norm": energy_norm,
+                "total_cost": total_cost,
+                "total_population": total_population,
+                "num_sites": num_sites,
+                "budget_used_pct": budget_used_pct,
+                "cost_change": cost_change,
+                "solution": [int(v) for v in x.tolist()],
+            })
+
+            # lightweight progress print for debugging
+            try:
+                print(f"  iter {it}: energy={energy:.2f}, cost=${total_cost:,.0f}, pop={total_population}")
+            except Exception:
+                pass
+
+            # Persist progress atomically each iteration so partial runs are saved
+            if record_progress:
+                try:
+                    _atomic_write_json(progress, out_path)
+                except Exception as e:
+                    try:
+                        with open(debug_log, "a") as f:
+                            f.write(f"failed per-iter write at iter {it}: {e}\n")
+                    except Exception:
+                        pass
+    except KeyboardInterrupt:
+        # Allow graceful interruption and fall through to final write
+        try:
+            with open(debug_log, "a") as f:
+                f.write("run interrupted by KeyboardInterrupt\n")
+        except Exception:
+            pass
+        print("run interrupted by user (KeyboardInterrupt)")
+    finally:
+        # Final persistence and figure generation (best-effort)
+        if record_progress and progress:
+            try:
+                _atomic_write_json(progress, out_path)
+                msg = f"wrote {len(progress)} progress entries to {out_path}\n"
+                print(msg)
+                try:
+                    with open(debug_log, "a") as f:
+                        f.write(msg)
+                except Exception:
+                    pass
+            except Exception as e:
+                emsg = f"failed to write progress JSON in finally: {e}\n"
+                print(emsg)
+                try:
+                    with open(debug_log, "a") as f:
+                        f.write(emsg)
+                except Exception:
+                    pass
+            # Draw the trajectory figure (non-fatal on failure)
+            try:
+                fig_dwave_trajectory(progress, name="D-Wave QBSolv")
+            except Exception as e:
+                emsg = f"fig_dwave_trajectory failed: {e}\n"
+                print(emsg)
+                try:
+                    with open(debug_log, "a") as f:
+                        f.write(emsg)
+                except Exception:
+                    pass
+
+    # Optionally record progress to disk and draw trajectory plot
+    if record_progress and progress:
+        out_path = os.path.join(FIGURES_DIR, "dwave_qbsolv_progress.json")
+        try:
+            with open(out_path, "w") as f:
+                json.dump(progress, f, indent=2)
+            msg = f"wrote {len(progress)} progress entries to {out_path}\n"
+            print(msg)
+            try:
+                with open(debug_log, "a") as f:
+                    f.write(msg)
+            except Exception:
+                pass
+            # Draw the trajectory figure (non-fatal on failure)
+            try:
+                fig_dwave_trajectory(progress, name="D-Wave QBSolv")
+            except Exception as e:
+                emsg = f"fig_dwave_trajectory failed: {e}\n"
+                print(emsg)
+                try:
+                    with open(debug_log, "a") as f:
+                        f.write(emsg)
+                except Exception:
+                    pass
+        except Exception as e:
+            emsg = f"failed to write progress JSON: {e}\n"
+            print(emsg)
+            try:
+                with open(debug_log, "a") as f:
+                    f.write(emsg + "\n")
+            except Exception:
+                pass
+
+    # Extract best sample (ensure variables ordered 0..n-1)
+    sample = best_sampleset.first.sample
+    return np.array([sample.get(i, 0) for i in range(n)], dtype=float)
 
 
 def run_qaoa_local(df, Q_small, num_sites_local=12):
@@ -432,7 +717,7 @@ def run_all_solvers(df, Q, ibm_backend=None, qaoa_local_sites=12, run_qaoa_local
         ("NAR Greedy",     lambda: run_nar(df)),
         ("Sim. Annealing", lambda: run_sa(df, Q)),
         ("Tabu Search",    lambda: run_tabu(df, Q)),
-        ("D-Wave Neal",    lambda: run_dwave_neal(df, Q)),
+        ("D-Wave QBSolv",    lambda: run_dwave_qbsolv(df, Q)),
     ]
 
     for name, fn in runners:
@@ -691,6 +976,85 @@ def fig06_sa_convergence(df, Q):
     _save(fig, "06_sa_convergence")
 
 
+def fig_dwave_trajectory(progress, name="D-Wave QBSolv"):
+    """Plot per-iteration trajectory for the D-Wave hybrid QBSolv runner.
+
+    Expects `progress` as a list of dicts with keys: iteration, energy,
+    energy_norm, total_cost, total_population, cost_change, ...
+    All series are normalized to [0,1] for overlaying.
+    """
+    # If no progress data, generate a small placeholder image
+    if not progress:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.text(0.5, 0.5, "No progress data", ha="center", va="center", fontsize=12)
+        ax.set_axis_off()
+        _save(fig, "dwave_qbsolv_trajectory")
+        return
+
+    dfp = pd.DataFrame(progress)
+    if dfp.empty:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.text(0.5, 0.5, "No progress data", ha="center", va="center", fontsize=12)
+        ax.set_axis_off()
+        _save(fig, "dwave_qbsolv_trajectory")
+        return
+
+    it = dfp["iteration"].astype(int)
+
+    def _norm(col):
+        s = col.astype(float)
+        mn, mx = s.min(), s.max()
+        if mx == mn:
+            return np.zeros_like(s)
+        return (s - mn) / (mx - mn)
+
+    # Normalize from raw `energy` values using the full progress series.
+    # This avoids artifacts introduced by incremental running-min/max
+    # normalization that can saturate values near 1.0 during the run.
+    if "energy" in dfp.columns:
+        energy_norm = _norm(dfp["energy"])
+    elif "energy_norm" in dfp.columns:
+        # Fallback to stored energy_norm if energy column not available
+        energy_norm = dfp["energy_norm"].astype(float)
+    else:
+        energy_norm = np.zeros(len(dfp))
+
+    budget_norm = _norm(dfp["total_cost"]) if "total_cost" in dfp.columns else np.zeros(len(dfp))
+    cost_change_norm = _norm(dfp["cost_change"]) if "cost_change" in dfp.columns else np.zeros(len(dfp))
+    pop_norm = _norm(dfp["total_population"]) if "total_population" in dfp.columns else np.zeros(len(dfp))
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    c_energy = SOLVER_COLORS.get(name, "#66CCEE")
+    # Continuous lines only (no shapes/markers) per user request
+    ax.plot(it, energy_norm, label="Energy (norm)", color=c_energy, linewidth=2)
+    ax.plot(it, budget_norm, label="Budget (norm)", color="#EE6677", linewidth=1.5)
+    ax.plot(it, cost_change_norm, label="Cost change (norm)", color="#CCBB44", linewidth=1.5)
+    ax.plot(it, pop_norm, label="Population (norm)", color="#4477AA", linewidth=1.5)
+
+    ax.set_xlabel("Iteration")
+    ax.set_ylabel("Normalized value (0-1)")
+    ax.grid(True, alpha=0.2)
+    # Ensure the y-axis shows the full 0..1 band even for single points
+    ax.set_ylim(-0.05, 1.05)
+    # Ensure x-axis has sensible padding for single-point series
+    if len(it) == 1:
+        ax.set_xlim(it.iloc[0] - 1, it.iloc[0] + 1)
+    else:
+        ax.set_xlim(it.min() - 0.5, it.max() + 0.5)
+
+    # Annotate last point for clarity (keeps a marker-like label text)
+    last_idx = dfp.index[-1]
+    last_it = int(dfp.loc[last_idx, "iteration"])
+    last_energy = energy_norm.iloc[-1] if len(energy_norm) else 0.0
+    ax.annotate(f"iter {last_it}", xy=(last_it, last_energy), xytext=(5, 5),
+                textcoords='offset points', fontsize=10)
+    # Place legend at the top-right (semi-transparent) to avoid hiding data
+    ax.legend(loc="upper right", frameon=True, fontsize=9, framealpha=0.85)
+    # Use default tight layout
+    fig.tight_layout()
+    _save(fig, "dwave_qbsolv_trajectory")
+
+
 def fig07_qubo_heatmap(Q):
     """QUBO matrix heatmap."""
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -741,15 +1105,22 @@ def fig09_pareto(results):
         ax.scatter(a["total_cost"], a["total_population"],
                    s=200, c=SOLVER_COLORS[name], edgecolors="black",
                    linewidth=1, zorder=3, label=name)
+        # Place label to the left of the marker for all solvers except NAR Greedy
+        if name == "NAR Greedy":
+            ha = "left"
+            xytext = (8, 4)
+        else:
+            ha = "right"
+            xytext = (-8, 4)
         ax.annotate(name, (a["total_cost"], a["total_population"]),
-                    fontsize=8, ha="left", va="bottom",
-                    xytext=(8, 4), textcoords="offset points")
+                fontsize=12, ha=ha, va="bottom",
+                xytext=xytext, textcoords="offset points")
     ax.axvline(BUDGET, color="red", linestyle="--", alpha=0.5,
                label=f"Budget = ${BUDGET:,}")
-    ax.set_xlabel("Total Cost (USD)")
-    ax.set_ylabel("Total Population Coverage")
-    ax.set_title("Cost vs Population Coverage", fontweight="bold")
-    ax.legend(fontsize=8)
+    ax.set_xlabel("Total Cost (USD)", fontsize=14)
+    ax.set_ylabel("Total Population Coverage", fontsize=14)
+    ax.set_title("Cost vs Population Coverage", fontweight="bold", fontsize=16)
+    ax.legend(fontsize=12, loc="lower right")
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(
         lambda x, _: f"${x:,.0f}"))
     ax.grid(True, alpha=0.3)
@@ -761,21 +1132,27 @@ def fig09_pareto(results):
         ax.scatter(a["total_cost"], a["total_energy"],
                    s=200, c=SOLVER_COLORS[name], edgecolors="black",
                    linewidth=1, zorder=3, label=name)
+        # Place label to the left of the marker for all solvers except NAR Greedy
+        if name == "NAR Greedy":
+            ha = "left"
+            xytext = (8, 4)
+        else:
+            ha = "right"
+            xytext = (-8, 4)
         ax.annotate(name, (a["total_cost"], a["total_energy"]),
-                    fontsize=8, ha="left", va="bottom",
-                    xytext=(8, 4), textcoords="offset points")
+                fontsize=12, ha=ha, va="bottom",
+                xytext=xytext, textcoords="offset points")
     ax.axvline(BUDGET, color="red", linestyle="--", alpha=0.5,
                label=f"Budget = ${BUDGET:,}")
-    ax.set_xlabel("Total Cost (USD)")
-    ax.set_ylabel("Total Energy Capacity (kWh/day)")
-    ax.set_title("Cost vs Energy Capacity", fontweight="bold")
-    ax.legend(fontsize=8)
+    ax.set_xlabel("Total Cost (USD)", fontsize=14)
+    ax.set_ylabel("Total Energy Capacity (kWh/day)", fontsize=14)
+    ax.set_title("Cost vs Energy Capacity", fontweight="bold", fontsize=16)
+    ax.legend(fontsize=12, loc="lower right")
     ax.xaxis.set_major_formatter(mticker.FuncFormatter(
         lambda x, _: f"${x:,.0f}"))
     ax.grid(True, alpha=0.3)
 
-    fig.suptitle("Pareto Analysis: Objective Trade-offs", fontsize=14,
-                 fontweight="bold")
+    # Removed suptitle per user request (title was moved to panel titles)
     fig.tight_layout()
     _save(fig, "09_pareto_objective_tradeoffs")
 
@@ -991,7 +1368,19 @@ def main():
     parser.add_argument("--rerun", type=str, default=None,
                         help="Comma-separated solver names to re-run fresh (must be used with "
                              "--from_csv or --load to load the rest from cache). "
-                             'e.g. --rerun \'D-Wave Neal\'')
+                            'e.g. --rerun \'D-Wave QBSolv\'' )
+    parser.add_argument("--record_progress", action="store_true",
+                        help="Record per-iteration progress for iterative solvers (D-Wave)")
+    parser.add_argument("--dwave_max_iter", type=int, default=20,
+                        help="Maximum hybrid iterations for D-Wave QBSolv runner")
+    parser.add_argument("--dwave_subproblem_size", type=int, default=None,
+                        help="Subproblem size for D-Wave QBSolv runner (default: auto)")
+    parser.add_argument("--dwave_num_reads", type=int, default=None,
+                        help="Tabu num_reads for D-Wave QBSolv runner (default: auto)")
+    parser.add_argument("--dwave_timeout_ms", type=int, default=None,
+                        help="Tabu timeout in ms for D-Wave QBSolv runner (default: auto)")
+    parser.add_argument("--dwave_no_clear_subsamples", action="store_true",
+                        help="Disable subsample clearing between D-Wave hybrid iterations")
     args = parser.parse_args()
 
     os.makedirs(FIGURES_DIR, exist_ok=True)
@@ -1012,7 +1401,13 @@ def main():
         "NAR Greedy":     lambda: run_nar(df),
         "Sim. Annealing": lambda: run_sa(df, Q),
         "Tabu Search":    lambda: run_tabu(df, Q),
-        "D-Wave Neal":    lambda: run_dwave_neal(df, Q),
+        "D-Wave QBSolv":  lambda: run_dwave_qbsolv(df, Q,
+                                                  max_iterations=args.dwave_max_iter,
+                                                  record_progress=args.record_progress,
+                                                  subproblem_size=args.dwave_subproblem_size,
+                                                  num_reads=args.dwave_num_reads,
+                                                  timeout_ms=args.dwave_timeout_ms,
+                                                  clear_subsamples=not args.dwave_no_clear_subsamples),
         "QAOA (IBM Torino)": lambda: run_qaoa_hardware(df, Q, args.ibm_backend),
     }
 
